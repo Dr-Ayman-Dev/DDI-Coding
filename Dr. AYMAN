@@ -129,6 +129,8 @@ print(np.mean(predicted == y_test))
 
 metrics.confusion_matrix(y_test, predicted)
 
+6. ML Models 
+
 from sklearn.ensemble import RandomForestClassifier
 
 clf = RandomForestClassifier(random_state=0)
@@ -138,7 +140,37 @@ predicted = clf.predict(X_test_counts[selected_features_name])
 print(metrics.classification_report(y_test, predicted))
 metrics.confusion_matrix(y_test, predicted)
 
-6. Visualizing the embeddings
+from sklearn.linear_model import LogisticRegression
+from sklearn.svm import LinearSVC
+from xgboost import XGBClassifier
+
+# Configure cross-validation
+cv = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+y.loc[y==2]  = 0
+
+# Define and train Logistic Regression
+#log_reg_model = LogisticRegression(random_state=42, max_iter=1000)
+log_reg_model = XGBClassifier(n_estimators=100, random_state=random_seed)
+
+predictions = cross_val_predict(log_reg_model, X, y, cv=cv) # method='predict_proba',
+#predictions = np.argmax(predictions_pro, axis=1)
+accuracy = accuracy_score(y, predictions)
+f1 = f1_score(y, predictions, average='macro')
+roc_auc = roc_auc_score(y, predictions)
+conf_matrix = confusion_matrix(y, predictions)
+print(f"Accuracy = {accuracy:.4f}")
+print(f"F1 Score = {f1:.4f}")
+print(f"ROC AUC Score = {roc_auc:.4f}")
+print('Confusion Matrix:')
+print(conf_matrix)
+cm_norm = conf_matrix.astype('float') / conf_matrix.sum(axis=1)[:, np.newaxis]
+# Print the normalized confusion matrix
+print(cm_norm)
+
+print(classification_report(y, predictions))
+
+
+7. Visualizing the embeddings
 
 def plot_LSA(test_data, test_labels, savepath="PCA_demo.csv", plot=True):
         lsa = TruncatedSVD(n_components=2)
