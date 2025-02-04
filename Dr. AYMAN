@@ -1,0 +1,158 @@
+1. Import libraries
+
+import pandas as pd
+import numpy as np
+import os
+
+import matplotlib
+import matplotlib.pyplot as plt
+import matplotlib.patches as mpatches
+import seaborn as sns
+
+
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
+from sklearn.model_selection import train_test_split
+from sklearn.decomposition import PCA, TruncatedSVD
+from sklearn.metrics import classification_report,confusion_matrix
+
+from collections import defaultdict
+from collections import Counter
+plt.style.use('ggplot')
+#stop=set(stopwords.words('english'))
+
+import re
+import gensim
+import string
+
+from tqdm import tqdm
+from keras.preprocessing.text import Tokenizer
+#from keras.preprocessing.sequence import pad_sequences
+from keras.models import Sequential
+from keras.layers import Embedding, LSTM,Dense, SpatialDropout1D, Dropout
+from keras.initializers import Constant
+#from keras.optimizers import Adam
+import itertools
+
+2. Download data
+
+from google.colab import drive
+drive.mount('/content/gdrive')
+
+#faers_data.to_pickle('/content/gdrive/MyDrive/FDA/FullData/ADRAll.pkl')
+faers_data = pd.read_pickle('/content/gdrive/MyDrive/FDA/FullData/ADRAll.pkl')
+faers_data.shape
+
+faers_data.shape, faers_data.columns
+
+faers_data.drugrecuraction.value_counts()
+
+3. Word2Vec
+
+import pandas as pd
+from gensim.models import Word2Vec
+
+# Assuming faers_data is your initial DataFrame
+df = faers_data.copy()
+df = df[df['medicinalproduct'].notnull()]
+
+# Filter out entries where 'medicinalproduct' is null
+#df = df[df['medicinalproduct'].notnull()]
+# Remove special characters from 'medicinalproduct' and treat the whole name as one token
+#df['medicinalproduct'] = df['medicinalproduct'].str.replace('[^\w\s]', '', regex=True).str.lower().str.replace(' ', '_')
+
+#df = clean_medicinalproduct(df)
+
+# Replace specific placeholder in 'drugindication'
+df['drugindication'] = df['drugindication'].replace('PRODUCT USED FOR UNKNOWN INDICATION', '')
+df['drugindication'] = df['drugindication'].fillna('').astype(str)
+df['drugindication'] = df['drugindication'].str.lower()
+
+
+# Ensure activesubstancename is a string and handle missing values
+df['activesubstancename'] = df['activesubstancename'].fillna('').astype(str)
+
+# Replace spaces with "_" in 'activesubstancename' to treat multi-token names as single tokens
+#df['activesubstancename'] = df['activesubstancename'].apply(lambda x: x.replace(' ', '_'))
+
+# Replace compound substance separator "\\" with space
+df['activesubstancename'] = df['activesubstancename'].replace(r'\\', ' ', regex=True)
+df['activesubstancename'] = df['activesubstancename'].str.lower()
+
+df.shape
+
+
+4. Cleanup and toknize Text Data
+import re
+
+def preprocess_product_name(name):
+    # Normalize spaces, remove extra spaces
+    name = str(name)
+    name = re.sub(r'\s+', ' ', name).strip()
+
+    # Split the name on any parentheses, commas, or spaces
+    #tokens = re.split(r'[(), -/]+', name)
+    tokens = re.split(r'[+:;(), \-/_\\^]+', name)
+
+    # Clean and filter tokens:
+    # - Convert to lowercase
+    # - Strip trailing punctuation
+    tokens = [token.lower().rstrip('.').strip() for token in tokens if token.strip()]
+
+    # Use regular expressions to filter out unwanted tokens and perform spell checking
+    filtered_tokens = []
+    for token in tokens:
+        # Skip tokens that are less than 3 characters, purely numerical, or match specific patterns
+        if len(token) > 3 and not token.isdigit() and not re.match(r'^(\d*\.\d+%|\d*\.?\d+mg|/\d+/)$', token):
+            filtered_tokens.append(token)
+
+    return ' '.join(filtered_tokens)
+df['medicinalproduct'] = df['medicinalproduct'].apply(preprocess_product_name)
+df.shape
+
+5. Build Word2Vec
+
+df['text_data'] = df.apply(lambda x: f"{x['medicinalproduct']} {x['activesubstancename']} {x['drugindication']}", axis=1)
+
+# Split the combined text into tokens
+df['text_tokens'] = df['text_data'].str.split()
+
+# Optional: Remove any NaN values if any row has them in 'text_tokens'
+df.dropna(subset=['text_tokens'], inplace=True)
+
+# Example of the data
+print(df['text_tokens'].head())
+
+from sklearn import metrics
+print(metrics.classification_report(y_test, predicted))
+print(f1_score(y_test, predicted,average ='macro'))
+print(np.mean(predicted == y_test))
+
+metrics.confusion_matrix(y_test, predicted)
+
+from sklearn.ensemble import RandomForestClassifier
+
+clf = RandomForestClassifier(random_state=0)
+clf.fit(X_train_counts[selected_features_name],  y_train)
+predicted = clf.predict(X_test_counts[selected_features_name])
+
+print(metrics.classification_report(y_test, predicted))
+metrics.confusion_matrix(y_test, predicted)
+
+6. Visualizing the embeddings
+
+def plot_LSA(test_data, test_labels, savepath="PCA_demo.csv", plot=True):
+        lsa = TruncatedSVD(n_components=2)
+        lsa.fit(test_data)
+        lsa_scores = lsa.transform(test_data)
+        color_mapper = {label:idx for idx,label in enumerate(set(test_labels))}
+        color_column = [color_mapper[label] for label in test_labels]
+        colors = ['orange','blue']
+        if plot:
+            plt.scatter(lsa_scores[:,0], lsa_scores[:,1], s=8, alpha=.8, c=test_labels, cmap=matplotlib.colors.ListedColormap(colors))
+            orange_patch = mpatches.Patch(color='orange', label='Not')
+            blue_patch = mpatches.Patch(color='blue', label='Real')
+            plt.legend(handles=[orange_patch, blue_patch], prop={'size': 30})
+
+fig = plt.figure(figsize=(16, 16))
+plot_LSA(X_train_counts, y_train)
+plt.show()
